@@ -6,14 +6,25 @@
         var rsBtn = document.getElementById('getReactSnippet'); if (rsBtn) rsBtn.addEventListener('click', getReactSnippet);
         document.getElementById('processBtn').addEventListener('click', processAll);
         // validate on inputs and selects
-        var inputs = ['commentMin', 'commentMax', 'tagMin', 'tagMax', 'sheetId', 'sheetSelect', 'nameCol', 'secCol', 'idCol', 'reactFile', 'commentFile'];
+        var inputs = ['commentMin', 'commentMax', 'tagMin', 'tagMax', 'sheetId', 'sheetSelect', 'nameCol', 'secCol', 'idCol', 'reactFile', 'commentFile', 'reactRequired', 'commentsRequired', 'tagsRequired'];
         inputs.forEach(function (id) {
             var el = document.getElementById(id);
             if (!el) return;
             var evt = (el.tagName === 'SELECT' || el.type === 'file') ? 'change' : 'input';
             el.addEventListener(evt, validateForm);
         });
+        // also listen to checkboxes to update visibility
+        var cbIds = ['reactRequired', 'commentsRequired', 'tagsRequired'];
+        cbIds.forEach(function (cid) {
+            var c = document.getElementById(cid);
+            if (c) {
+                ['change', 'input', 'click'].forEach(function (evt) {
+                    c.addEventListener(evt, function () { updateFileVisibility(); validateForm(); });
+                });
+            }
+        });
         // initial validation
+        updateFileVisibility();
         validateForm();
     });
 
@@ -51,6 +62,7 @@
             populateHeaderSelect('secCol', headers);
             populateHeaderSelect('idCol', headers);
             // re-run validation after headers populate
+            updateFileVisibility();
             validateForm();
         }).withFailureHandler(function (err) {
             alert('Error loading headers: ' + err.message);
@@ -87,18 +99,23 @@
             secondaryCol: document.getElementById('secCol').value,
             identifierCol: document.getElementById('idCol').value,
             reactRequired: document.getElementById('reactRequired') ? document.getElementById('reactRequired').checked : false,
+            commentsRequired: document.getElementById('commentsRequired') ? document.getElementById('commentsRequired').checked : false,
+            tagsRequired: document.getElementById('tagsRequired') ? document.getElementById('tagsRequired').checked : false,
             commentMin: document.getElementById('commentMin').value,
             commentMax: document.getElementById('commentMax').value,
             tagMin: document.getElementById('tagMin').value,
             tagMax: document.getElementById('tagMax').value,
         };
 
-        Promise.all([
-            readFileAsText(document.getElementById('reactFile')),
-            readFileAsText(document.getElementById('commentFile'))
-        ]).then(function (vals) {
-            form.reactCsv = vals[0];
-            form.commentCsv = vals[1];
+        // Only read files that are visible/required; readFileAsText resolves to '' if no file
+        var reads = [];
+        var reactEl = document.getElementById('reactFile');
+        var commentEl = document.getElementById('commentFile');
+        reads.push(readFileAsText(reactEl));
+        reads.push(readFileAsText(commentEl));
+        Promise.all(reads).then(function (vals) {
+            form.reactCsv = vals[0] || '';
+            form.commentCsv = vals[1] || '';
             document.getElementById('processBtn').disabled = true;
             document.getElementById('results').innerHTML = 'Processing...';
             google.script.run.withSuccessHandler(showResults).withFailureHandler(function (err) {
@@ -129,6 +146,13 @@
         var nameCol = document.getElementById('nameCol').value;
         var secCol = document.getElementById('secCol').value;
         var idCol = document.getElementById('idCol').value;
+        var reactReqEl = document.getElementById('reactRequired');
+        var commentsReqEl = document.getElementById('commentsRequired');
+        var tagsReqEl = document.getElementById('tagsRequired');
+        var reactRequired = reactReqEl ? reactReqEl.checked : false;
+        var commentsRequired = commentsReqEl ? commentsReqEl.checked : false;
+        var tagsRequired = tagsReqEl ? tagsReqEl.checked : false;
+        var needCommentUpload = commentsRequired || tagsRequired;
         var reactFile = document.getElementById('reactFile').files[0];
         var commentFile = document.getElementById('commentFile').files[0];
 
@@ -152,41 +176,68 @@
             showFormError('Identifier (FB link) column must be selected');
             return false;
         }
-        if (!reactFile) {
-            showFormError('Please upload the Reacts CSV');
-            return false;
-        }
-        if (!commentFile) {
-            showFormError('Please upload the Comments CSV');
-            return false;
-        }
-
-        // range checks
-        var cMin = document.getElementById('commentMin').value;
-        var cMax = document.getElementById('commentMax').value;
-        var tMin = document.getElementById('tagMin').value;
-        var tMax = document.getElementById('tagMax').value;
-        function isBlank(v) { return v === null || v === undefined || String(v).trim() === '' }
-        function asInt(v) { return parseInt(v, 10); }
-        if (!isBlank(cMax)) {
-            var a = asInt(cMin || 0);
-            var b = asInt(cMax);
-            if (!isNaN(a) && !isNaN(b) && a > b) {
-                showFormError('Comments min cannot be greater than Comments max');
+        if (reactRequired) {
+            if (!reactFile) {
+                showFormError('Please upload the Reacts CSV');
                 return false;
             }
         }
-        if (!isBlank(tMax)) {
-            var a2 = asInt(tMin || 0);
-            var b2 = asInt(tMax);
-            if (!isNaN(a2) && !isNaN(b2) && a2 > b2) {
-                showFormError('Tags min cannot be greater than Tags max');
+        if (needCommentUpload) {
+            if (!commentFile) {
+                showFormError('Please upload the Comments CSV');
                 return false;
+            }
+        }
+
+        // range checks (only when their requirements are enabled)
+        function isBlank(v) { return v === null || v === undefined || String(v).trim() === '' }
+        function asInt(v) { return parseInt(v, 10); }
+        if (commentsRequired) {
+            var cMin = document.getElementById('commentMin').value;
+            var cMax = document.getElementById('commentMax').value;
+            if (!isBlank(cMax)) {
+                var a = asInt(cMin || 0);
+                var b = asInt(cMax);
+                if (!isNaN(a) && !isNaN(b) && a > b) {
+                    showFormError('Comments min cannot be greater than Comments max');
+                    return false;
+                }
+            }
+        }
+        if (tagsRequired) {
+            var tMin = document.getElementById('tagMin').value;
+            var tMax = document.getElementById('tagMax').value;
+            if (!isBlank(tMax)) {
+                var a2 = asInt(tMin || 0);
+                var b2 = asInt(tMax);
+                if (!isNaN(a2) && !isNaN(b2) && a2 > b2) {
+                    showFormError('Tags min cannot be greater than Tags max');
+                    return false;
+                }
             }
         }
 
         showFormError('');
         return true;
+    }
+
+    function updateFileVisibility() {
+        var reactReqEl = document.getElementById('reactRequired');
+        var commentsReqEl = document.getElementById('commentsRequired');
+        var tagsReqEl = document.getElementById('tagsRequired');
+        var reactRequired = reactReqEl ? reactReqEl.checked : false;
+        var commentsRequired = commentsReqEl ? commentsReqEl.checked : false;
+        var tagsRequired = tagsReqEl ? tagsReqEl.checked : false;
+        var reactContainer = document.getElementById('reactFileContainer');
+        var commentContainer = document.getElementById('commentFileContainer');
+        if (reactContainer) reactContainer.style.display = reactRequired ? 'block' : 'none';
+        var showComment = commentsRequired || tagsRequired;
+        if (commentContainer) commentContainer.style.display = showComment ? 'block' : 'none';
+        // also show/hide the comment/tag criteria rows (min/max inputs)
+        var commentCriteria = document.getElementById('commentCriteria');
+        var tagCriteria = document.getElementById('tagCriteria');
+        if (commentCriteria) commentCriteria.style.display = commentsRequired ? 'flex' : 'none';
+        if (tagCriteria) tagCriteria.style.display = tagsRequired ? 'flex' : 'none';
     }
 
     // Helper to fetch raw file from GitHub blob URL and copy to clipboard

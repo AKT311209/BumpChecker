@@ -80,10 +80,14 @@ function processFiles(form) {
 
         // Criteria: reactRequired (boolean) and comment/tag ranges
         var reactRequired = (form.reactRequired === true || form.reactRequired === 'true');
-        var commentMin = parseInt(form.commentMin || 0, 10) || 0;
-        var commentMax = parseInt(form.commentMax || 0, 10) || Infinity;
-        var tagMin = parseInt(form.tagMin || 0, 10) || 0;
-        var tagMax = parseInt(form.tagMax || 0, 10) || Infinity;
+        var commentsRequired = (form.commentsRequired === true || form.commentsRequired === 'true');
+        var tagsRequired = (form.tagsRequired === true || form.tagsRequired === 'true');
+
+        // Only parse min/max if the corresponding requirement is enabled; otherwise ignore ranges
+        var commentMin = commentsRequired ? (parseInt(form.commentMin || 0, 10) || 0) : 0;
+        var commentMax = commentsRequired ? (parseInt(form.commentMax || 0, 10) || Infinity) : Infinity;
+        var tagMin = tagsRequired ? (parseInt(form.tagMin || 0, 10) || 0) : 0;
+        var tagMax = tagsRequired ? (parseInt(form.tagMax || 0, 10) || Infinity) : Infinity;
 
         // Evaluate each member
         var results = [];
@@ -104,26 +108,30 @@ function processFiles(form) {
                 }
             }
 
-            // Comments: mark faults or OK
-            if (comments === 0) {
-                status.flags.push('No comment');
-            } else if (comments < commentMin) {
-                status.flags.push('Not enough comments');
-            } else if (comments > commentMax && isFinite(commentMax)) {
-                status.flags.push('Too many comments');
-            } else {
-                status.flags.push('Comment OK');
+            // Comments: only evaluate if comments were requested
+            if (commentsRequired) {
+                if (comments === 0) {
+                    status.flags.push('No comment');
+                } else if (comments < commentMin) {
+                    status.flags.push('Not enough comments');
+                } else if (comments > commentMax && isFinite(commentMax)) {
+                    status.flags.push('Too many comments');
+                } else {
+                    status.flags.push('Comment OK');
+                }
             }
 
-            // Tags: mark faults or OK
-            if (tags === 0) {
-                status.flags.push('No tags');
-            } else if (tags < tagMin) {
-                status.flags.push('Not enough tags');
-            } else if (tags > tagMax && isFinite(tagMax)) {
-                status.flags.push('Too many tags');
-            } else {
-                status.flags.push('Tag OK');
+            // Tags: only evaluate if tags were requested
+            if (tagsRequired) {
+                if (tags === 0) {
+                    status.flags.push('No tags');
+                } else if (tags < tagMin) {
+                    status.flags.push('Not enough tags');
+                } else if (tags > tagMax && isFinite(tagMax)) {
+                    status.flags.push('Too many tags');
+                } else {
+                    status.flags.push('Tag OK');
+                }
             }
 
             results.push(status);

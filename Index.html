@@ -38,8 +38,14 @@
                 <div>
                     <label><input type="checkbox" id="reactRequired" checked> Require react</label>
                 </div>
+                <div>
+                    <label><input type="checkbox" id="commentsRequired" checked> Require Comments</label>
+                </div>
+                <div>
+                    <label><input type="checkbox" id="tagsRequired" checked> Require Tag</label>
+                </div>
             </div>
-            <div class="criteria-row">
+            <div class="criteria-row" id="commentCriteria">
                 <div>
                     <label>Comments min</label>
                     <input type="number" id="commentMin" min="0" value="0">
@@ -49,7 +55,7 @@
                     <input type="number" id="commentMax" min="0" placeholder="Infinity">
                 </div>
             </div>
-            <div class="criteria-row">
+            <div class="criteria-row" id="tagCriteria">
                 <div>
                     <label>Tags min</label>
                     <input type="number" id="tagMin" min="0" value="0">
@@ -64,8 +70,8 @@
         <div class="section">
             <h3>Snippets</h3>
             <div class="snippet-row">
-                <button id="getCommentSnippet" class="btn-secondary">Get Comment Snippet</button>
                 <button id="getReactSnippet" class="btn-secondary">Get React Snippet</button>
+                <button id="getCommentSnippet" class="btn-secondary">Get Comment & Tag Snippet</button>
             </div>
             <div class="muted">Click to copy the corresponding script snippet to your clipboard.</div>
         </div>
@@ -73,11 +79,11 @@
         <div class="section">
             <h3>Upload CSVs</h3>
             <div class="file-row">
-                <div class="file-col">
+                <div class="file-col" id="reactFileContainer">
                     <label>Reacts CSV</label>
                     <input type="file" id="reactFile" accept=".csv">
                 </div>
-                <div class="file-col">
+                <div class="file-col" id="commentFileContainer">
                     <label>Comments CSV</label>
                     <input type="file" id="commentFile" accept=".csv">
                 </div>
