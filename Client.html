@@ -1,0 +1,199 @@
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('loadSheets').addEventListener('click', loadSheets);
+        document.getElementById('sheetSelect').addEventListener('change', loadHeaders);
+        var csBtn = document.getElementById('getCommentSnippet'); if (csBtn) csBtn.addEventListener('click', getCommentSnippet);
+        var rsBtn = document.getElementById('getReactSnippet'); if (rsBtn) rsBtn.addEventListener('click', getReactSnippet);
+        document.getElementById('processBtn').addEventListener('click', processAll);
+    });
+
+    function getIdFromInput(val) {
+        if (!val) return '';
+        // If full URL, extract id
+        var m = val.match(/[-\w]{25,}/);
+        return m ? m[0] : val;
+    }
+
+    function loadSheets() {
+        var sheetVal = document.getElementById('sheetId').value.trim();
+        var id = getIdFromInput(sheetVal);
+        if (!id) return alert('Enter spreadsheet ID or URL');
+        document.getElementById('sheetSelect').innerHTML = '<option>Loading...</option>';
+        google.script.run.withSuccessHandler(function (sheets) {
+            var sel = document.getElementById('sheetSelect');
+            sel.innerHTML = '';
+            sheets.forEach(function (name) {
+                var o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+            });
+            loadHeaders();
+        }).withFailureHandler(function (err) {
+            alert('Error loading sheets: ' + err.message);
+        }).getSheetNames(id);
+    }
+
+    function loadHeaders() {
+        var sheetVal = document.getElementById('sheetId').value.trim();
+        var id = getIdFromInput(sheetVal);
+        var sheetName = document.getElementById('sheetSelect').value;
+        if (!id || !sheetName) return;
+        google.script.run.withSuccessHandler(function (headers) {
+            populateHeaderSelect('nameCol', headers);
+            populateHeaderSelect('secCol', headers);
+            populateHeaderSelect('idCol', headers);
+        }).withFailureHandler(function (err) {
+            alert('Error loading headers: ' + err.message);
+        }).getSheetHeaders(id, sheetName);
+    }
+
+    function populateHeaderSelect(id, headers) {
+        var sel = document.getElementById(id);
+        sel.innerHTML = '';
+        headers.forEach(function (h) {
+            var o = document.createElement('option'); o.value = h; o.textContent = h; sel.appendChild(o);
+        });
+    }
+
+    function readFileAsText(inputEl) {
+        return new Promise(function (resolve) {
+            var file = inputEl.files[0];
+            if (!file) return resolve('');
+            var reader = new FileReader();
+            reader.onload = function (e) { resolve(e.target.result); };
+            reader.readAsText(file);
+        });
+    }
+
+    function processAll() {
+        var sheetVal = document.getElementById('sheetId').value.trim();
+        var id = getIdFromInput(sheetVal);
+        if (!id) return alert('Spreadsheet ID required');
+        var form = {
+            sheetId: id,
+            sheetName: document.getElementById('sheetSelect').value,
+            nameCol: document.getElementById('nameCol').value,
+            secondaryCol: document.getElementById('secCol').value,
+            identifierCol: document.getElementById('idCol').value,
+            reactRequired: document.getElementById('reactRequired') ? document.getElementById('reactRequired').checked : false,
+            commentMin: document.getElementById('commentMin').value,
+            commentMax: document.getElementById('commentMax').value,
+            tagMin: document.getElementById('tagMin').value,
+            tagMax: document.getElementById('tagMax').value,
+        };
+
+        Promise.all([
+            readFileAsText(document.getElementById('reactFile')),
+            readFileAsText(document.getElementById('commentFile'))
+        ]).then(function (vals) {
+            form.reactCsv = vals[0];
+            form.commentCsv = vals[1];
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('results').innerHTML = 'Processing...';
+            google.script.run.withSuccessHandler(showResults).withFailureHandler(function (err) {
+                alert('Processing failed: ' + err.message);
+                document.getElementById('processBtn').disabled = false;
+            }).processFiles(form);
+        });
+    }
+
+    // Helper to fetch raw file from GitHub blob URL and copy to clipboard
+    function githubRawUrl(blobUrl) {
+        if (!blobUrl) return blobUrl;
+        // Convert https://github.com/<user>/<repo>/blob/<branch>/path -> https://raw.githubusercontent.com/<user>/<repo>/<branch>/path
+        return blobUrl.replace(/^https:\/\/github.com\//i, 'https://raw.githubusercontent.com/').replace('/blob/', '/');
+    }
+
+    function copyToClipboard(text) {
+        if (!text) return Promise.reject(new Error('No text to copy'));
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'absolute';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                var ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) resolve(); else reject(new Error('execCommand copy failed'));
+            } catch (e) {
+                document.body.removeChild(ta);
+                reject(e);
+            }
+        });
+    }
+
+    function getSnippetFromGithub(blobUrl) {
+        var raw = githubRawUrl(blobUrl);
+        return fetch(raw).then(function (resp) {
+            if (!resp.ok) throw new Error('Fetch failed: ' + resp.status);
+            return resp.text();
+        });
+    }
+
+    function getCommentSnippet() {
+        var url = 'https://github.com/AKT311209/JSUtils/blob/main/Get-Commentors-FB.txt';
+        document.getElementById('results').textContent = 'Fetching comment snippet...';
+        getSnippetFromGithub(url).then(function (txt) {
+            return copyToClipboard(txt).then(function () {
+                document.getElementById('results').textContent = 'Comment snippet copied to clipboard.';
+            });
+        }).catch(function (err) {
+            alert('Failed to get/copy comment snippet: ' + err.message);
+            document.getElementById('results').textContent = '';
+        });
+    }
+
+    function getReactSnippet() {
+        var url = 'https://github.com/AKT311209/JSUtils/blob/main/Get-Reactors-FB.txt';
+        document.getElementById('results').textContent = 'Fetching react snippet...';
+        getSnippetFromGithub(url).then(function (txt) {
+            return copyToClipboard(txt).then(function () {
+                document.getElementById('results').textContent = 'React snippet copied to clipboard.';
+            });
+        }).catch(function (err) {
+            alert('Failed to get/copy react snippet: ' + err.message);
+            document.getElementById('results').textContent = '';
+        });
+    }
+
+    function showResults(payload) {
+        document.getElementById('processBtn').disabled = false;
+        if (!payload || !payload.results) return document.getElementById('results').textContent = 'No results';
+        var results = payload.results;
+        var container = document.getElementById('results');
+        container.innerHTML = '';
+
+        // Group by flags for readability
+        results.forEach(function (r) {
+            var card = document.createElement('div'); card.className = 'card';
+            var title = document.createElement('div'); title.className = 'card-title';
+            title.textContent = r.name + ' — ' + r.secondary;
+            var id = document.createElement('div'); id.className = 'muted'; id.textContent = r.identifier;
+            var counts = document.createElement('div'); counts.textContent = 'Reacts: ' + r.reacts + '  Comments: ' + r.comments + '  Tags: ' + r.tags;
+            var flags = document.createElement('div'); flags.className = 'flags';
+            // Render each flag with color coding: OK (green), faults (red), neutral otherwise
+            r.flags.forEach(function (f, idx) {
+                var span = document.createElement('span');
+                span.textContent = f;
+                var lower = String(f).toLowerCase();
+                if (lower.indexOf('ok') !== -1 || lower.indexOf('reacted') !== -1) {
+                    span.className = 'flag-ok';
+                } else if (lower.indexOf('no') !== -1 || lower.indexOf('not') !== -1 || lower.indexOf('too') !== -1) {
+                    span.className = 'flag-bad';
+                } else {
+                    span.className = 'flag-neutral';
+                }
+                flags.appendChild(span);
+                if (idx < r.flags.length - 1) {
+                    var sep = document.createElement('span'); sep.textContent = ' · '; sep.className = 'flag-sep'; flags.appendChild(sep);
+                }
+            });
+            card.appendChild(title); card.appendChild(id); card.appendChild(counts); card.appendChild(flags);
+            container.appendChild(card);
+        });
+    }
+</script>

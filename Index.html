@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title>BumpChecker</title>
+    <?!= include('Styles'); ?>
+</head>
+
+<body>
+    <div class="container">
+        <h1>BumpChecker</h1>
+
+        <div class="section">
+            <label>Spreadsheet ID or URL</label>
+            <input type="text" id="sheetId" placeholder="Spreadsheet ID or full URL">
+            <button id="loadSheets">Load sheets</button>
+        </div>
+
+        <div class="section">
+            <label>Choose sheet</label>
+            <select id="sheetSelect"></select>
+        </div>
+
+        <div class="section">
+            <label>Name column</label>
+            <select id="nameCol"></select>
+            <label>Secondary ID column</label>
+            <select id="secCol"></select>
+            <label>Identifier (FB link) column</label>
+            <select id="idCol"></select>
+        </div>
+
+        <div class="section">
+            <h3>Criteria</h3>
+            <div class="criteria-row">
+                <div>
+                    <label><input type="checkbox" id="reactRequired" checked> Require react</label>
+                </div>
+            </div>
+            <div class="criteria-row">
+                <div>
+                    <label>Comments min</label>
+                    <input type="number" id="commentMin" min="0" value="0">
+                </div>
+                <div>
+                    <label>Comments max</label>
+                    <input type="number" id="commentMax" min="0" placeholder="Infinity">
+                </div>
+            </div>
+            <div class="criteria-row">
+                <div>
+                    <label>Tags min</label>
+                    <input type="number" id="tagMin" min="0" value="0">
+                </div>
+                <div>
+                    <label>Tags max</label>
+                    <input type="number" id="tagMax" min="0" placeholder="Infinity">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Snippets</h3>
+            <div class="snippet-row">
+                <button id="getCommentSnippet" class="btn-secondary">Get Comment Snippet</button>
+                <button id="getReactSnippet" class="btn-secondary">Get React Snippet</button>
+            </div>
+            <div class="muted">Click to copy the corresponding script snippet to your clipboard.</div>
+        </div>
+
+        <div class="section">
+            <h3>Upload CSVs</h3>
+            <div class="file-row">
+                <div class="file-col">
+                    <label>Reacts CSV</label>
+                    <input type="file" id="reactFile" accept=".csv">
+                </div>
+                <div class="file-col">
+                    <label>Comments CSV</label>
+                    <input type="file" id="commentFile" accept=".csv">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <button id="processBtn">Process</button>
+        </div>
+
+        <div class="section">
+            <h3>Results</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <?!= include('Client'); ?>
+</body>
+
+</html>
