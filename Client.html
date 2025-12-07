@@ -5,6 +5,16 @@
         var csBtn = document.getElementById('getCommentSnippet'); if (csBtn) csBtn.addEventListener('click', getCommentSnippet);
         var rsBtn = document.getElementById('getReactSnippet'); if (rsBtn) rsBtn.addEventListener('click', getReactSnippet);
         document.getElementById('processBtn').addEventListener('click', processAll);
+        // validate on inputs and selects
+        var inputs = ['commentMin', 'commentMax', 'tagMin', 'tagMax', 'sheetId', 'sheetSelect', 'nameCol', 'secCol', 'idCol', 'reactFile', 'commentFile'];
+        inputs.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            var evt = (el.tagName === 'SELECT' || el.type === 'file') ? 'change' : 'input';
+            el.addEventListener(evt, validateForm);
+        });
+        // initial validation
+        validateForm();
     });
 
     function getIdFromInput(val) {
@@ -40,6 +50,8 @@
             populateHeaderSelect('nameCol', headers);
             populateHeaderSelect('secCol', headers);
             populateHeaderSelect('idCol', headers);
+            // re-run validation after headers populate
+            validateForm();
         }).withFailureHandler(function (err) {
             alert('Error loading headers: ' + err.message);
         }).getSheetHeaders(id, sheetName);
@@ -67,6 +79,7 @@
         var sheetVal = document.getElementById('sheetId').value.trim();
         var id = getIdFromInput(sheetVal);
         if (!id) return alert('Spreadsheet ID required');
+        if (!validateForm()) return; // abort if invalid
         var form = {
             sheetId: id,
             sheetName: document.getElementById('sheetSelect').value,
@@ -93,6 +106,87 @@
                 document.getElementById('processBtn').disabled = false;
             }).processFiles(form);
         });
+    }
+
+    function showFormError(msg) {
+        var container = document.getElementById('formErrorContainer');
+        var el = document.getElementById('formError');
+        if (!msg) {
+            if (container) container.style.display = 'none';
+            if (el) el.textContent = '';
+            document.getElementById('processBtn').disabled = false;
+            return;
+        }
+        if (container) container.style.display = 'block';
+        if (el) el.textContent = msg;
+        document.getElementById('processBtn').disabled = true;
+    }
+
+    function validateForm() {
+        // required fields
+        var sheetId = document.getElementById('sheetId').value;
+        var sheetSel = document.getElementById('sheetSelect').value;
+        var nameCol = document.getElementById('nameCol').value;
+        var secCol = document.getElementById('secCol').value;
+        var idCol = document.getElementById('idCol').value;
+        var reactFile = document.getElementById('reactFile').files[0];
+        var commentFile = document.getElementById('commentFile').files[0];
+
+        if (!sheetId || String(sheetId).trim() === '') {
+            showFormError('Spreadsheet ID or URL is required');
+            return false;
+        }
+        if (!sheetSel || String(sheetSel).trim() === '') {
+            showFormError('Please choose a sheet');
+            return false;
+        }
+        if (!nameCol || String(nameCol).trim() === '') {
+            showFormError('Name column must be selected');
+            return false;
+        }
+        if (!secCol || String(secCol).trim() === '') {
+            showFormError('Secondary ID column must be selected');
+            return false;
+        }
+        if (!idCol || String(idCol).trim() === '') {
+            showFormError('Identifier (FB link) column must be selected');
+            return false;
+        }
+        if (!reactFile) {
+            showFormError('Please upload the Reacts CSV');
+            return false;
+        }
+        if (!commentFile) {
+            showFormError('Please upload the Comments CSV');
+            return false;
+        }
+
+        // range checks
+        var cMin = document.getElementById('commentMin').value;
+        var cMax = document.getElementById('commentMax').value;
+        var tMin = document.getElementById('tagMin').value;
+        var tMax = document.getElementById('tagMax').value;
+        function isBlank(v) { return v === null || v === undefined || String(v).trim() === '' }
+        function asInt(v) { return parseInt(v, 10); }
+        if (!isBlank(cMax)) {
+            var a = asInt(cMin || 0);
+            var b = asInt(cMax);
+            if (!isNaN(a) && !isNaN(b) && a > b) {
+                showFormError('Comments min cannot be greater than Comments max');
+                return false;
+            }
+        }
+        if (!isBlank(tMax)) {
+            var a2 = asInt(tMin || 0);
+            var b2 = asInt(tMax);
+            if (!isNaN(a2) && !isNaN(b2) && a2 > b2) {
+                showFormError('Tags min cannot be greater than Tags max');
+                return false;
+            }
+        }
+
+        showFormError('');
+        return true;
     }
 
     // Helper to fetch raw file from GitHub blob URL and copy to clipboard
